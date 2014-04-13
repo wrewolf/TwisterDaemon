@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Configuration.Install;
 using System.Diagnostics;
@@ -28,6 +29,8 @@ namespace TwisterDaemon
         {
             if ( !Directory.Exists(dir) )
                 Directory.CreateDirectory(dir);
+            Directory.SetCurrentDirectory(dir);
+                
             InitLogger();
             // Старт сервиса
             if ( !System.Environment.UserInteractive )
@@ -84,21 +87,91 @@ namespace TwisterDaemon
 
             base.OnStart(args);
         }
+
         private static Process p;
         private static void daemon()
         {
-
+            TryToCloseProcessByPids(getPIDsByFullPath(dir + @"twister\twisterd.exe"));
             while ( true )
             {
                 p = new Process();
-                p.StartInfo = new ProcessStartInfo(dir + "twisterd.exe", @"-datadir=./ -rpcuser=user -rpcpassword=pwd -rpcallowip=127.0.0.1");
+                p.StartInfo = new ProcessStartInfo(dir + @"twister\twisterd.exe", @"-datadir=./data -htmldir=./html -rpcuser=user -rpcpassword=pwd -rpcallowip=127.0.0.1");
                 p.StartInfo.WorkingDirectory = dir;
                 p.StartInfo.UseShellExecute = false;
                 p.StartInfo.WindowStyle = ProcessWindowStyle.Hidden;
-
                 p.Start();
+                AddPeer();
                 p.WaitForExit();
             }
+        }
+
+        private static  void AddPeer()
+        {
+            Thread.Sleep(2000);
+            p = new Process();
+            p.StartInfo = new ProcessStartInfo(dir + @"twister\twisterd.exe", "-rpcuser=user -rpcpassword=pwd addnode seed3.twister.net.co onetry");
+            p.Start();
+            Thread.Sleep(2000);
+            p = new Process();
+            p.StartInfo = new ProcessStartInfo(dir + @"twister\twisterd.exe", "-rpcuser=user -rpcpassword=pwd addnode seed2.twister.net.co onetry");
+            p.Start();
+            Thread.Sleep(2000);
+            p = new Process();
+            p.StartInfo = new ProcessStartInfo(dir + @"twister\twisterd.exe", "-rpcuser=user -rpcpassword=pwd addnode seed.twister.net.co onetry");
+            p.Start();
+            Thread.Sleep(2000);
+            p = new Process();
+            p.StartInfo = new ProcessStartInfo(dir + @"twister\twisterd.exe", "-rpcuser=user -rpcpassword=pwd addnode dnsseed.gombadi.com onetry");
+            p.Start();
+            Thread.Sleep(2000);
+            p = new Process();
+            p.StartInfo = new ProcessStartInfo(dir + @"twister\twisterd.exe", "-rpcuser=user -rpcpassword=pwd addnode dnsseed.gombadi.com onetry");
+            p.Start();
+            Thread.Sleep(2000);
+        }
+
+
+        public static List<int> getPIDsByFullPath(string path)
+        {
+            ConcurrentQueue<int> pids = new ConcurrentQueue<int>();
+            object lk = new object();
+            Process[] processlist = Process.GetProcesses();
+
+            // Console.ReadLine();
+            path = path.Replace(@"\\", @"\").Replace(@"\\", @"\").Replace(@"\\", @"\").Replace(@"\\", @"\");
+
+            string Filename;
+            foreach ( var process in processlist )
+            {
+                try
+                {
+                    Filename = process.MainModule.FileName;
+                }
+                catch
+                {
+                    Filename = "";
+                }
+                if ( Path.Equals(Filename, path) )
+                {
+                    pids.Enqueue(process.Id);
+                }
+            }
+
+            return pids.ToList<int>();
+        }
+
+        public static void TryToCloseProcessByPids(List<int> pids, bool safe = true)
+        {
+            foreach ( var pid in pids )
+            {
+                var process = Process.GetProcessById(pid);
+                if ( !process.HasExited )
+                {
+                    process.Kill();
+                    process.WaitForExit();
+                }
+            }
+            return;
         }
 
         protected override void OnStop()
